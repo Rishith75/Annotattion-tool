@@ -4,6 +4,10 @@ import Signup from './Signup';
 import Signin from './Signin';
 import Home from './Home';
 import Profile from './Profile';
+import CreateProject from './CreateProject';
+import EditProject from './EditProject';
+import Tasks from './Tasks';
+import Annotate from './Annotate';
 
 function App() {
   return (
@@ -13,8 +17,12 @@ function App() {
         <Route path="/signin" element={<Signin />} />
         <Route path="/home" element={<Home />} />
         <Route path="/profile" element={<Profile />} />
-        <Route path="/" element={<Navigate to="/signup" replace />} />
-        <Route path="*" element={<Navigate to="/signup" replace />} />
+        <Route path="/create_project" element={<CreateProject />} />
+        <Route path="/edit_project/:id" element={<EditProject />} />
+        <Route path="/" element={<Navigate to="/signin" replace />} />
+        <Route path="*" element={<Navigate to="/signin" replace />} />
+        <Route path="/tasks" element={<Tasks />} />
+        <Route path="/annotate/:id" element={<Annotate />} />
       </Routes>
     </Router>
   );
