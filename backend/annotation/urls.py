@@ -13,7 +13,8 @@ urlpatterns = [
     path('projects/update/<int:pk>/', views.update_project, name='project-update'),
     path('projects/delete/<int:pk>/', views.delete_project, name='project-delete'),
 
-    path('tasks/', views.get_tasks, name='get_tasks'),  # GET all tasks
-    path('task/<int:task_id>/', views.get_task, name='get_task'),  # GET one task (singular)
-    path('tasks/<int:task_id>/save_annotations/', views.save_annotations, name='save_annotations'),  # POST annotations
+    path('tasks/', views.get_tasks, name='get_tasks'),  
+    path('task/<int:task_id>/', views.get_task, name='get_task'),  
+    path('tasks/<int:task_id>/annotations/', views.get_annotations, name='get_annotations'),
+    path('tasks/<int:task_id>/save_annotations/', views.save_annotations, name='save_annotations'),  
 ]

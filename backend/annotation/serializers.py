@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Project, Label, Attribute, AttributeValue, AudioFile,Task
+from .models import User, Project, Label, Attribute, AttributeValue, AudioFile,Task,Annotation, AnnotationAttributeValue
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -53,9 +53,17 @@ class LabelSerializer(serializers.ModelSerializer):
 
 
 class AudioFileSerializer(serializers.ModelSerializer):
+    file = serializers.SerializerMethodField()
+
     class Meta:
         model = AudioFile
         fields = ['id', 'file', 'optimized']
+
+    def get_file(self, obj):
+        request = self.context.get('request')
+        if request is not None:
+            return request.build_absolute_uri(obj.file.url)
+        return obj.file.url
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -97,7 +105,24 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 class TaskSerializer(serializers.ModelSerializer):
     audio_file = AudioFileSerializer()
-    project = serializers.StringRelatedField()
+    project =  ProjectSerializer()
     class Meta:
         model = Task
         fields = ['id', 'project', 'audio_file', 'status']
+
+class AnnotationAttributeValueSerializer(serializers.ModelSerializer):
+    attribute_id = serializers.IntegerField(source='attribute.id')
+    value_id = serializers.IntegerField(source='value.id')
+
+    class Meta:
+        model = AnnotationAttributeValue
+        fields = ['attribute_id', 'value_id']
+
+
+class AnnotationSerializer(serializers.ModelSerializer):
+    label_id = serializers.IntegerField(source='label.id')
+    attributes = AnnotationAttributeValueSerializer(source='attribute_values', many=True)
+
+    class Meta:
+        model = Annotation
+        fields = ['id', 'label_id', 'start_time', 'end_time', 'attributes']

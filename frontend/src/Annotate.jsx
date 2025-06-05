@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Container, Navbar, Nav, Image, Button, Form } from 'react-bootstrap';
 import axios from 'axios';
 import { API_ROUTES } from './api';
+import WaveformAnnotator from './WaveformAnnotator';
 
 function Annotate() {
   const { id } = useParams();
@@ -13,25 +14,34 @@ function Annotate() {
   const [status, setStatus] = useState('New');
 
   useEffect(() => {
-    axios.get(`${API_ROUTES.getTask}/${id}`)
+    console.log("Fetching task with ID:", id);
+    axios.get(API_ROUTES.getTask(id))
       .then(res => {
         setTask(res.data);
-        setAnnotations(res.data.annotations || []);
         setStatus(res.data.status);
+  
+        // Fetch annotations
+        return axios.get(API_ROUTES.getAnnotations(id));
       })
-      .catch(err => console.error('Error fetching task:', err));
+      .then(res => {
+        setAnnotations(res.data);
+      })
+      .catch(err => console.error('Error:', err));
   }, [id]);
+  
 
   const handleSave = () => {
-    axios.put(`${API_ROUTES.updateTask}/${id}/`, {
+    axios.post(API_ROUTES.saveAnnotations(id), {
       annotations,
       status
     })
       .then(() => navigate('/tasks'))
       .catch(err => console.error('Error saving annotation:', err));
   };
+  
 
   if (!task) return <div>Loading...</div>;
+  console.log("Audio URL:", task.audio_file.file);
 
   return (
     <>
@@ -62,13 +72,14 @@ function Annotate() {
           <option>Completed</option>
         </Form.Select>
 
-        {task.project.display_waveform  && (
-          <div className="my-3">
-            <h6>Waveform View (Placeholder)</h6>
-            {/* Add waveform viewer here */}
-          </div>
+        {task?.project?.display_waveform  && (
+          <WaveformAnnotator
+          audioUrl={task.audio_file.file}
+          initialAnnotations={annotations}
+          onAnnotationsChange={setAnnotations}
+        />
         )}
-        {task.project.display_spectrogram  && (
+        {task?.project?.display_spectrogram  && (
           <div className="my-3">
             <h6>Spectrogram View (Placeholder)</h6>
             {/* Add spectrogram viewer here */}
