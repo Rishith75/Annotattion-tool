@@ -5,6 +5,7 @@ import { Container, Navbar, Nav, Image, Button, Form } from 'react-bootstrap';
 import axios from 'axios';
 import { API_ROUTES } from './api';
 import WaveformAnnotator from './WaveformAnnotator';
+import SpectrogramViewer from './SpectrogramViewer';
 
 function Annotate() {
   const { id } = useParams();
@@ -71,7 +72,12 @@ function Annotate() {
           <option>In Progress</option>
           <option>Completed</option>
         </Form.Select>
-
+        {task?.project?.display_spectrogram  && (
+          <div className="my-3">
+          <SpectrogramViewer audioUrl={task.audio_file.file} />
+        </div>
+        )}
+        
         {task?.project?.display_waveform  && (
           <WaveformAnnotator
           audioUrl={task.audio_file.file}
@@ -79,27 +85,7 @@ function Annotate() {
           onAnnotationsChange={setAnnotations}
         />
         )}
-        {task?.project?.display_spectrogram  && (
-          <div className="my-3">
-            <h6>Spectrogram View (Placeholder)</h6>
-            {/* Add spectrogram viewer here */}
-          </div>
-        )}
-
-        <div className="my-3">
-          <h5>Annotations</h5>
-          {/* Replace below with real annotation UI */}
-          <Form.Control
-            as="textarea"
-            rows={5}
-            value={annotations.map(a => `${a.label} - ${a.start}s to ${a.end}s`).join('\n')}
-            onChange={e => setAnnotations(e.target.value.split('\n').map(line => {
-              const [label, range] = line.split(' - ');
-              const [start, end] = range?.replace('s', '').split(' to ') || [0, 0];
-              return { label, start: parseFloat(start), end: parseFloat(end) };
-            }))}
-          />
-        </div>
+        
 
         <Button onClick={handleSave}>Save</Button>
       </Container>

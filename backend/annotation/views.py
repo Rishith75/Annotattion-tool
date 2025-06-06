@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
 from .models import User, Project, AudioFile,Task, Annotation, AnnotationAttributeValue, Label, Attribute, AttributeValue
-from .serializers import UserSerializer, ProjectSerializer,TaskSerializer,AnnotationSerializer,AnnotationAttributeValueSerializer
+from .serializers import UserSerializer, ProjectSerializer,TaskSerializer,AnnotationSerializer,AnnotationAttributeValueSerializer,LabelSerializer
 
 
 @api_view(['GET'])
@@ -211,9 +211,17 @@ def get_task(request, task_id):
 @api_view(['GET'])
 def get_annotations(request, task_id):
     try:
-        task = Task.objects.get(pk=task_id)
+        task = Task.objects.select_related('project').get(pk=task_id)
         annotations = task.annotations.all()
-        serializer = AnnotationSerializer(annotations, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        annotation_serializer = AnnotationSerializer(annotations, many=True)
+
+        project = task.project
+        label_serializer = LabelSerializer(project.labels.all(), many=True)
+
+        return Response({
+            'annotations': annotation_serializer.data,
+            'labels': label_serializer.data
+        }, status=status.HTTP_200_OK)
+
     except Task.DoesNotExist:
         return Response({'error': 'Task not found'}, status=status.HTTP_404_NOT_FOUND)
