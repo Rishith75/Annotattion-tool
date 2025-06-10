@@ -8,6 +8,7 @@ import CreateProject from './CreateProject';
 import EditProject from './EditProject';
 import Tasks from './Tasks';
 import Annotate from './Annotate';
+import AudioWaveformLabeler from './AudioWaveformLabeler';
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
         <Route path="*" element={<Navigate to="/signin" replace />} />
         <Route path="/tasks" element={<Tasks />} />
         <Route path="/annotate/:id" element={<Annotate />} />
+        <Route path="/example" element={<AudioWaveformLabeler/>}/>
       </Routes>
     </Router>
   );

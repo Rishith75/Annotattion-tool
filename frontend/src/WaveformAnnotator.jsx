@@ -1,141 +1,272 @@
-import React, { useEffect, useRef, useState } from 'react';
-import WaveSurfer from 'wavesurfer.js';
-import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.js';
+import React, { useState, useRef, useEffect } from 'react';
+import { Play, Pause } from 'lucide-react';
 
-const WaveformAnnotator = ({ audioUrl, labels, attributes, taskId, onSaveAnnotation, existingAnnotations }) => {
+const WaveformAnnotator = ({ audioUrl, labels, initialAnnotations, onAnnotationsChange }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [regions, setRegions] = useState({});
+  const [selectedRegion, setSelectedRegion] = useState(null);
+  const [editingRegionId, setEditingRegionId] = useState(null);
+  const [selectedLabelId, setSelectedLabelId] = useState('');
+  const [selectedAttributes, setSelectedAttributes] = useState({});
+  const [showLabelModal, setShowLabelModal] = useState(false);
+
   const waveformRef = useRef(null);
-  const wavesurferRef = useRef(null);
-  const [selectedRegionId, setSelectedRegionId] = useState(null);
-  const [regionData, setRegionData] = useState({ labelId: '', attributeValues: {} });
+  const wavesurfer = useRef(null);
+  const regionsPlugin = useRef(null);
 
   useEffect(() => {
-    if (!audioUrl || !waveformRef.current) return;
+    let isMounted = true;
 
-    if (wavesurferRef.current) {
-      try {
-        wavesurferRef.current.destroy();
-      } catch (e) {
-        console.warn('WaveSurfer destroy failed:', e);
-      }
-    }
+    const initWaveSurfer = async () => {
+      const WaveSurfer = (await import('wavesurfer.js')).default;
+      const RegionsPlugin = (await import('wavesurfer.js/dist/plugins/regions.esm.js')).default;
 
-    const ws = WaveSurfer.create({
-      container: waveformRef.current,
-      waveColor: '#ccc',
-      progressColor: '#4f46e5',
-      height: 100,
-      responsive: true,
-      plugins: [
-        RegionsPlugin.create({
-          dragSelection: {
-            slop: 5,
-            color: 'rgba(79, 70, 229, 0.3)',
-          }
-        })
-      ]
-    });
+      if (!isMounted) return;
 
-    wavesurferRef.current = ws;
-    ws.load(audioUrl);
-
-    // Allow drag to create region from any point (like Audino)
-    ws.on('region-created', (region) => {
-      setSelectedRegionId(region.id);
-      setRegionData({ labelId: '', attributeValues: {} });
-    });
-
-    ws.on('region-click', (region, e) => {
-      e.stopPropagation();
-      setSelectedRegionId(region.id);
-      const annotation = existingAnnotations?.find(a => a.region_id === region.id);
-      setRegionData({
-        labelId: annotation?.label_id || '',
-        attributeValues: annotation?.attribute_values || {}
+      regionsPlugin.current = RegionsPlugin.create();
+      wavesurfer.current = WaveSurfer.create({
+        container: waveformRef.current,
+        waveColor: '#4f46e5',
+        progressColor: '#7c3aed',
+        cursorColor: '#ef4444',
+        barWidth: 2,
+        barRadius: 3,
+        responsive: true,
+        height: 200,
+        plugins: [regionsPlugin.current],
       });
-    });
 
-    ws.on('ready', () => {
-      existingAnnotations?.forEach((a) => {
-        ws.addRegion({
-          id: a.region_id,
-          start: a.start_time,
-          end: a.end_time,
-          color: 'rgba(79, 70, 229, 0.3)',
-        });
+      wavesurfer.current.on('play', () => setIsPlaying(true));
+      wavesurfer.current.on('pause', () => setIsPlaying(false));
+      wavesurfer.current.on('finish', () => setIsPlaying(false));
+
+      regionsPlugin.current.on('region-created', handleRegionClick);
+      regionsPlugin.current.on('region-clicked', (region) => {
+        setSelectedRegion(region);
+        handleRegionClick(region);
       });
-    });
+
+      regionsPlugin.current.enableDragSelection({ color: 'rgba(99, 102, 241, 0.3)' });
+
+      wavesurfer.current.load(audioUrl);
+    };
+
+    initWaveSurfer();
 
     return () => {
-      try {
-        ws.destroy();
-      } catch (err) {
-        console.warn('WaveSurfer destroy error on unmount:', err);
-      }
+      isMounted = false;
+      wavesurfer.current?.destroy();
+      wavesurfer.current = null;
     };
   }, [audioUrl]);
 
-  const handleLabelChange = (e) => {
-    const labelId = e.target.value;
-    setRegionData({ labelId, attributeValues: {} });
+  useEffect(() => {
+    if (regionsPlugin.current && initialAnnotations?.length > 0) {
+      initialAnnotations.forEach((ann) => {
+        const region = regionsPlugin.current.addRegion({
+          start: ann.start_time,
+          end: ann.end_time,
+          color: 'rgba(34, 197, 94, 0.3)',
+          data: { annotationId: ann.id },
+        });
+
+        setRegions((prev) => ({
+          ...prev,
+          [region.id]: {
+            label: ann.label_id,
+            attributes: ann.attributes.reduce((acc, val) => {
+              acc[val.attribute_id] = val.value_id;
+              return acc;
+            }, {}),
+          },
+        }));
+      });
+    }
+  }, [initialAnnotations]);
+
+  useEffect(() => {
+    if (editingRegionId && regions[editingRegionId]) {
+      setSelectedLabelId(regions[editingRegionId].label);
+      setSelectedAttributes(regions[editingRegionId].attributes);
+    }
+  }, [editingRegionId]);
+
+  const handleRegionClick = (region) => {
+    const existing = regions[region.id];
+
+    setSelectedRegion(region);
+    setEditingRegionId(region.id);
+
+    if (existing) {
+      setSelectedLabelId(existing.label);
+      setSelectedAttributes(existing.attributes);
+    } else {
+      setSelectedLabelId('');
+      setSelectedAttributes({});
+    }
+
+    setShowLabelModal(true);
   };
 
-  const handleAttributeChange = (attributeId, value) => {
-    setRegionData((prev) => ({
-      ...prev,
-      attributeValues: {
-        ...prev.attributeValues,
-        [attributeId]: value,
-      },
-    }));
-  };
+  const handleLabelSave = () => {
+    if (!editingRegionId || !selectedLabelId) return;
 
-  const handleSave = () => {
-    const region = wavesurferRef.current.regions.list[selectedRegionId];
-    if (!region || !regionData.labelId) return;
-    onSaveAnnotation({
-      region_id: region.id,
-      start_time: region.start,
-      end_time: region.end,
-      label_id: regionData.labelId,
-      attribute_values: regionData.attributeValues,
+    const region = regionsPlugin.current.getRegions().find((r) => r.id === editingRegionId);
+    if (region) {
+      region.setOptions({
+        color: 'rgba(34, 197, 94, 0.3)',
+        borderColor: '#22c55e',
+      });
+    }
+
+    setShowLabelModal(false);
+    setEditingRegionId(null);
+    setSelectedLabelId('');
+    setSelectedAttributes({});
+
+    const outputAnnotations = Object.entries(regions).map(([id, value]) => {
+      const r = regionsPlugin.current.getRegions().find((r) => r.id === id);
+      return {
+        start_time: r.start,
+        end_time: r.end,
+        label_id: value.label,
+        attributes: Object.entries(value.attributes).map(([attrId, valId]) => ({
+          attribute_id: parseInt(attrId),
+          value_id: parseInt(valId),
+        })),
+      };
     });
-    setSelectedRegionId(null);
-    setRegionData({ labelId: '', attributeValues: {} });
+
+    onAnnotationsChange(outputAnnotations);
+  };
+
+  const handlePlay = () => {
+    if (!wavesurfer.current) return;
+
+    if (selectedRegion) {
+      wavesurfer.current.setTime(selectedRegion.start);
+      wavesurfer.current.play();
+
+      const stopTime = selectedRegion.end;
+      const checkTime = () => {
+        if (wavesurfer.current.getCurrentTime() >= stopTime) {
+          wavesurfer.current.pause();
+        } else if (isPlaying) {
+          requestAnimationFrame(checkTime);
+        }
+      };
+      requestAnimationFrame(checkTime);
+    } else {
+      isPlaying ? wavesurfer.current.pause() : wavesurfer.current.play();
+    }
   };
 
   return (
-    <div>
-      <div ref={waveformRef} className="mb-3" />
+    <div className="w-full">
+      <div ref={waveformRef} className="w-full h-40 bg-gray-100 rounded-lg mb-4" />
+      <div className="flex justify-center mb-4">
+        <button
+          onClick={handlePlay}
+          className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+        >
+          {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+          {selectedRegion ? ' Play Region' : ' Play Audio'}
+        </button>
+      </div>
 
-      {selectedRegionId && (
-        <div className="border p-3 rounded shadow-sm bg-light">
-          <h6>Annotate Region</h6>
+      {showLabelModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-md w-96">
+            <h3 className="text-lg font-bold mb-2">
+              {regions[editingRegionId] ? 'Edit Annotation' : 'Add Annotation'}
+            </h3>
 
-          <label className="form-label">Label</label>
-          <select className="form-select mb-2" value={regionData.labelId} onChange={handleLabelChange}>
-            <option value="">-- Select Label --</option>
-            {labels?.map((label) => (
-              <option key={label.id} value={label.id}>{label.name}</option>
-            ))}
-          </select>
+            {/* Label Selection */}
+            <label className="block text-sm font-medium mb-1">Label</label>
+            <select
+              value={selectedLabelId}
+              onChange={(e) => {
+                const labelId = parseInt(e.target.value);
+                setSelectedLabelId(labelId);
+                setSelectedAttributes({});
+                setRegions((prev) => ({
+                  ...prev,
+                  [editingRegionId]: {
+                    label: labelId,
+                    attributes: {},
+                  },
+                }));
+              }}
+              className="w-full border px-3 py-2 rounded mb-4"
+            >
+              <option value="">Select a label</option>
+              {labels.map((label) => (
+                <option key={label.id} value={label.id}>
+                  {label.name}
+                </option>
+              ))}
+            </select>
 
-          {regionData.labelId && attributes?.[regionData.labelId]?.map((attr) => (
-            <div key={attr.id} className="mb-2">
-              <label className="form-label">{attr.name}</label>
-              <select
-                className="form-select"
-                value={regionData.attributeValues[attr.id] || ''}
-                onChange={(e) => handleAttributeChange(attr.id, e.target.value)}
-              >
-                <option value="">-- Select --</option>
-                {attr.values.map((val, idx) => (
-                  <option key={idx} value={val}>{val}</option>
+            {/* Attribute Selection */}
+            {selectedLabelId &&
+              labels
+                .find((l) => l.id === selectedLabelId)
+                ?.attributes.map((attr) => (
+                  <div key={attr.id} className="mb-3">
+                    <label className="block text-sm font-medium mb-1">{attr.name}</label>
+                    <select
+                      value={selectedAttributes[attr.id] || ''}
+                      onChange={(e) => {
+                        const valId = e.target.value;
+                        const attrId = attr.id;
+
+                        setSelectedAttributes((prev) => ({
+                          ...prev,
+                          [attrId]: valId,
+                        }));
+
+                        setRegions((prev) => ({
+                          ...prev,
+                          [editingRegionId]: {
+                            ...prev[editingRegionId],
+                            attributes: {
+                              ...prev[editingRegionId]?.attributes,
+                              [attrId]: valId,
+                            },
+                          },
+                        }));
+                      }}
+                      className="w-full border px-3 py-2 rounded"
+                    >
+                      <option value="">Select a value</option>
+                      {attr.values.map((val) => (
+                        <option key={val.id} value={val.id}>
+                          {val.value}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 ))}
-              </select>
-            </div>
-          ))}
 
-          <button className="btn btn-primary mt-2" onClick={handleSave}>Save Annotation</button>
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => {
+                  setShowLabelModal(false);
+                  setEditingRegionId(null);
+                  setSelectedAttributes({});
+                }}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleLabelSave}
+                className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+              >
+                Save
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

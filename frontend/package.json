@@ -13,10 +13,14 @@
     "axios": "^1.9.0",
     "bootstrap": "^5.3.6",
     "bootstrap-icons": "^1.13.1",
+    "konva": "^9.3.20",
+    "lucide-react": "^0.513.0",
+    "peaks.js": "^3.4.2",
     "react": "^19.1.0",
     "react-bootstrap": "^2.10.10",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.1",
+    "waveform-data": "^4.5.2",
     "wavesurfer.js": "^7.9.5"
   },
   "devDependencies": {

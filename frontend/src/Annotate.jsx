@@ -1,4 +1,3 @@
-/* Annotate.jsx */
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Container, Navbar, Nav, Image, Button, Form } from 'react-bootstrap';
@@ -15,34 +14,29 @@ function Annotate() {
   const [status, setStatus] = useState('New');
 
   useEffect(() => {
-    console.log("Fetching task with ID:", id);
     axios.get(API_ROUTES.getTask(id))
       .then(res => {
         setTask(res.data);
         setStatus(res.data.status);
-  
-        // Fetch annotations
         return axios.get(API_ROUTES.getAnnotations(id));
       })
       .then(res => {
         setAnnotations(res.data);
       })
-      .catch(err => console.error('Error:', err));
+      .catch(err => console.error('Error fetching task or annotations:', err));
   }, [id]);
-  
 
   const handleSave = () => {
+    console.log("Save button clicked!", { annotations, status });
     axios.post(API_ROUTES.saveAnnotations(id), {
       annotations,
       status
     })
       .then(() => navigate('/tasks'))
-      .catch(err => console.error('Error saving annotation:', err));
+      .catch(err => console.error('Error saving annotations:', err));
   };
-  
 
   if (!task) return <div>Loading...</div>;
-  console.log("Audio URL:", task.audio_file.file);
 
   return (
     <>
@@ -72,22 +66,24 @@ function Annotate() {
           <option>In Progress</option>
           <option>Completed</option>
         </Form.Select>
-        {task?.project?.display_spectrogram  && (
-          <div className="my-3">
-          <SpectrogramViewer audioUrl={task.audio_file.file} />
-        </div>
-        )}
-        
-        {task?.project?.display_waveform  && (
-          <WaveformAnnotator
-          audioUrl={task.audio_file.file}
-          initialAnnotations={annotations}
-          onAnnotationsChange={setAnnotations}
-        />
-        )}
-        
 
-        <Button onClick={handleSave}>Save</Button>
+        {task.project.display_spectrogram && (
+          <div className="my-3">
+            <SpectrogramViewer audioUrl={task.audio_file.file} />
+          </div>
+        )}
+
+        {task.project.display_waveform && (
+          <WaveformAnnotator
+             audioUrl={task.audio_file.file}
+             labels={task.project.labels}
+              initialAnnotations={annotations}
+              onAnnotationsChange={setAnnotations}
+          />
+        )}
+
+
+        <Button onClick={handleSave} className="mt-3">Save</Button>
       </Container>
     </>
   );

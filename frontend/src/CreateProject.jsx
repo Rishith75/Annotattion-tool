@@ -99,17 +99,23 @@ function CreateProject() {
     formData.append('display_spectrogram', displaySpectrogram.toString());
     formData.append('optimize', optimize.toString());
     formData.append('degree', degree.toString());
-  
-    // ✅ Append user ID from localStorage
     formData.append('user', user.id);
   
-    // ✅ Append audio files
+    // Add audio files
     Array.from(audioFiles).forEach((file) => {
       formData.append('audio_files', file);
     });
   
-    // ✅ Append labels (properly stringified)
-    formData.append('labels', JSON.stringify(labels));
+    // Ensure labels, attributes, and values are all strings
+    const cleanedLabels = labels.map((label) => ({
+      name: String(label.name || ''),
+      attributes: (label.attributes || []).map((attr) => ({
+        name: String(attr.name || ''),
+        values: (attr.values || []).map((v) => String(v || '')),
+      })),
+    }));
+  
+    formData.append('labels', JSON.stringify(cleanedLabels));
   
     try {
       await axios.post(API_ROUTES.createProject, formData, {
@@ -121,6 +127,7 @@ function CreateProject() {
       alert('Failed to create project. Check console for details.');
     }
   };
+  
   
 
   return (
