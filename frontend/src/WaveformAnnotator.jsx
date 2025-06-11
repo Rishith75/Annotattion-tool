@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause } from 'lucide-react';
+import { Play, Pause, Trash2 } from 'lucide-react';
+import axios from 'axios';
+import { API_ROUTES } from './api';
 
 const WaveformAnnotator = ({ audioUrl, labels, initialAnnotations, onAnnotationsChange }) => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -22,7 +24,6 @@ const WaveformAnnotator = ({ audioUrl, labels, initialAnnotations, onAnnotations
     const initWaveSurfer = async () => {
       const WaveSurfer = (await import('wavesurfer.js')).default;
       const RegionsPlugin = (await import('wavesurfer.js/dist/plugins/regions.esm.js')).default;
-
       if (!isMounted) return;
 
       regionsPlugin.current = RegionsPlugin.create();
@@ -38,14 +39,25 @@ const WaveformAnnotator = ({ audioUrl, labels, initialAnnotations, onAnnotations
         plugins: [regionsPlugin.current],
       });
 
-      wavesurfer.current.on('play', () => setIsPlaying(true));
+      wavesurfer.current.on('play',  () => setIsPlaying(true));
       wavesurfer.current.on('pause', () => setIsPlaying(false));
-      wavesurfer.current.on('finish', () => setIsPlaying(false));
+      wavesurfer.current.on('finish',() => setIsPlaying(false));
 
-      regionsPlugin.current.on('region-created', handleRegionClick);
-      regionsPlugin.current.on('region-clicked', (region) => {
-        setSelectedRegion(region);
+      // New region: initialize with no annotationId
+      regionsPlugin.current.on('region-created', region => {
+        setRegions(prev => ({
+          ...prev,
+          [region.id]: { annotationId: null, label: '', attributes: {} }
+        }));
+      });
+
+      // Click region: open modal
+      regionsPlugin.current.on('region-clicked', region => {
         handleRegionClick(region);
+      });
+
+      wavesurfer.current.on('interaction', () => {
+        setSelectedRegion(null);
       });
 
       regionsPlugin.current.enableDragSelection({ color: 'rgba(99, 102, 241, 0.3)' });
@@ -55,210 +67,193 @@ const WaveformAnnotator = ({ audioUrl, labels, initialAnnotations, onAnnotations
     };
 
     initWaveSurfer();
-
-    return () => {
-      isMounted = false;
-      wavesurfer.current?.destroy();
-      wavesurfer.current = null;
-    };
+    return () => { isMounted = false; wavesurfer.current?.destroy(); };
   }, [audioUrl]);
 
-  // ✅ Load annotations when audio is ready and annotations arrive
+  // Load existing annotations ONCE
   useEffect(() => {
-    if (isAudioReady && initialAnnotations?.length > 0 && regionsPlugin.current) {
-      const newRegions = {};
-
-      initialAnnotations.forEach((ann) => {
-        const region = regionsPlugin.current.addRegion({
-          start: ann.start_time,
-          end: ann.end_time,
-          color: 'rgba(34, 197, 94, 0.3)',
-          drag: true,
-          resize: true,
-          data: { annotationId: ann.id },
-        });
-
-        newRegions[region.id] = {
-          label: ann.label_id,
-          attributes: Array.isArray(ann.attributes)
-            ? ann.attributes.reduce((acc, val) => {
-                acc[val.attribute_id] = val.value_id;
-                return acc;
-              }, {})
-            : {},
-        };
+    if (!isAudioReady || !initialAnnotations?.length || Object.keys(regions).length) return;
+    const newRegions = {};
+    initialAnnotations.forEach(ann => {
+      const region = regionsPlugin.current.addRegion({
+        start: ann.start_time,
+        end: ann.end_time,
+        color: 'rgba(34, 197, 94, 0.3)',
+        drag: true,
+        resize: true,
+        data: { annotationId: ann.id },
       });
-
-      setRegions(newRegions);
-    }
-  }, [isAudioReady, initialAnnotations]);
+      newRegions[region.id] = {
+        annotationId: ann.id,
+        label: ann.label_id || '',
+        attributes: Array.isArray(ann.attributes)
+          ? ann.attributes.reduce((acc, v) => { acc[v.attribute_id] = v.value_id; return acc; }, {})
+          : {},
+      };
+    });
+    setRegions(newRegions);
+  }, [isAudioReady, initialAnnotations, regions]);
 
   useEffect(() => {
     if (editingRegionId && regions[editingRegionId]) {
-      setSelectedLabelId(regions[editingRegionId].label || '');
-      setSelectedAttributes(regions[editingRegionId].attributes || {});
+      const rd = regions[editingRegionId];
+      setSelectedLabelId(rd.label);
+      setSelectedAttributes(rd.attributes);
     }
-  }, [editingRegionId]);
+  }, [editingRegionId, regions]);
 
-  const handleRegionClick = (region) => {
-    const existing = regions[region.id];
-
+  const handleRegionClick = region => {
+    const rd = regions[region.id] || { annotationId: null, label: '', attributes: {} };
     setSelectedRegion(region);
     setEditingRegionId(region.id);
-    setSelectedLabelId(existing?.label || '');
-    setSelectedAttributes(existing?.attributes || {});
+    setSelectedLabelId(rd.label);
+    setSelectedAttributes(rd.attributes);
     setError('');
     setShowLabelModal(true);
   };
 
   const handleLabelSave = () => {
-    if (!editingRegionId) return;
-
-    if (!selectedLabelId) {
+    if (!editingRegionId || !selectedLabelId) {
       setError('Label is required.');
       return;
     }
+    const region = regionsPlugin.current.getRegions().find(r => r.id === editingRegionId);
+    region.setOptions({ color: 'rgba(34, 197, 94, 0.3)', borderColor: '#22c55e' });
 
-    const region = regionsPlugin.current.getRegions().find((r) => r.id === editingRegionId);
-    if (region) {
-      region.setOptions({
-        color: 'rgba(34, 197, 94, 0.3)',
-        borderColor: '#22c55e',
-      });
-    }
+    // Save on backend if new
+    const annId = regions[editingRegionId].annotationId;
+    // ...you may want to POST or PATCH here if integrating immediately...
 
-    const updatedRegions = {
+    const updated = {
       ...regions,
       [editingRegionId]: {
+        annotationId: annId,
         label: selectedLabelId,
-        attributes: selectedAttributes,
-      },
+        attributes: selectedAttributes
+      }
     };
-
-    setRegions(updatedRegions);
+    setRegions(updated);
     setShowLabelModal(false);
     setEditingRegionId(null);
     setSelectedLabelId('');
     setSelectedAttributes({});
     setError('');
 
-    const outputAnnotations = Object.entries(updatedRegions).map(([id, value]) => {
-      const r = regionsPlugin.current.getRegions().find((r) => r.id === id);
+    const out = Object.entries(updated).map(([id,val]) => {
+      const r = regionsPlugin.current.getRegions().find(x=>x.id===id);
       return {
         start_time: r.start,
         end_time: r.end,
-        label_id: parseInt(value.label),
-        attributes: Object.entries(value.attributes).map(([attrId, valId]) => ({
-          attribute_id: parseInt(attrId),
-          value_id: parseInt(valId),
-        })),
+        label_id: val.label,
+        attributes: Object.entries(val.attributes).map(([a,v])=>({attribute_id:+a,value_id:+v}))
       };
     });
-
-    onAnnotationsChange(outputAnnotations);
+    onAnnotationsChange(out);
   };
 
-  const handlePlay = () => {
-    if (!wavesurfer.current) return;
-
-    if (selectedRegion) {
-      wavesurfer.current.setTime(selectedRegion.start);
-      wavesurfer.current.play();
-
-      const stopTime = selectedRegion.end;
-      const checkTime = () => {
-        if (wavesurfer.current.getCurrentTime() >= stopTime) {
-          wavesurfer.current.pause();
-        } else if (isPlaying) {
-          requestAnimationFrame(checkTime);
-        }
-      };
-      requestAnimationFrame(checkTime);
-    } else {
-      isPlaying ? wavesurfer.current.pause() : wavesurfer.current.play();
+  const handleDelete = async () => {
+    if (!editingRegionId) return;
+    const rd = regions[editingRegionId];
+    if (rd.annotationId) {
+      try { await axios.delete(API_ROUTES.deleteAnnotation(rd.annotationId)); }
+      catch(e){ console.error(e); }
     }
+    const region = regionsPlugin.current.getRegions().find(r=>r.id===editingRegionId);
+    region.remove();
+    const updated = {...regions}; delete updated[editingRegionId];
+    setRegions(updated);
+    setShowLabelModal(false);
+    setEditingRegionId(null);
+    const out = Object.entries(updated).map(([id,val])=>{
+      const r=regionsPlugin.current.getRegions().find(x=>x.id===id);
+      return { start_time:r.start,end_time:r.end,label_id:val.label,attributes:Object.entries(val.attributes).map(([a,v])=>({attribute_id:+a,value_id:+v})) };
+    });
+    onAnnotationsChange(out);
+  };
+
+  const handlePlayAudio = () => {
+    if (!wavesurfer.current) return;
+    wavesurfer.current.isPlaying() ? wavesurfer.current.pause() : wavesurfer.current.play();
+  };
+
+  const handlePlayRegion = () => {
+    if (!wavesurfer.current || !selectedRegion) return;
+    const { start, end } = selectedRegion;
+    wavesurfer.current.setTime(start);
+    wavesurfer.current.play();
+    const stopper = () => {
+      if (wavesurfer.current.getCurrentTime() >= end) {
+        wavesurfer.current.pause();
+        wavesurfer.current.un('audioprocess', stopper);
+      }
+    };
+    wavesurfer.current.on('audioprocess', stopper);
   };
 
   return (
     <div className="w-full">
       <div ref={waveformRef} className="w-full h-40 bg-gray-100 rounded-lg mb-4" />
-      <div className="flex justify-center mb-4">
+
+      <div className="flex justify-center mb-4 gap-4">
         <button
-          onClick={handlePlay}
-          className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+          onClick={handlePlayAudio}
+          className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 flex items-center gap-2"
         >
-          {isPlaying ? <Pause size={16} /> : <Play size={16} />}
-          {selectedRegion ? ' Play Region' : ' Play Audio'}
+          {isPlaying ? <Pause size={16}/> : <Play size={16}/>} Play Audio
         </button>
+        {selectedRegion && (
+          <button
+            onClick={handlePlayRegion}
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 flex items-center gap-2"
+          >
+            <Play size={16}/> Play Region
+          </button>
+        )}
       </div>
 
       {showLabelModal && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-md w-96">
-            <h3 className="text-lg font-bold mb-2">
-              {regions[editingRegionId] ? 'Edit Annotation' : 'Add Annotation'}
-            </h3>
+            <h3 className="text-lg font-bold mb-2">{
+              regions[editingRegionId] ? 'Edit Annotation' : 'Add Annotation'
+            }</h3>
 
             <label className="block text-sm font-medium mb-1">Label *</label>
             <select
               value={selectedLabelId}
-              onChange={(e) => {
-                const labelId = parseInt(e.target.value);
-                setSelectedLabelId(labelId);
-                setSelectedAttributes({});
-              }}
+              onChange={e=>{setSelectedLabelId(+e.target.value);setSelectedAttributes({});}}
               className="w-full border px-3 py-2 rounded mb-2"
             >
               <option value="">Select a label</option>
-              {labels.map((label) => (
-                <option key={label.id} value={label.id}>
-                  {label.name}
-                </option>
+              {labels.map(l=>(
+                <option key={l.id} value={l.id}>{l.name}</option>
               ))}
             </select>
 
-            {selectedLabelId &&
-              labels
-                .find((l) => l.id === selectedLabelId)
-                ?.attributes.map((attr) => (
-                  <div key={attr.id} className="mb-3">
-                    <label className="block text-sm font-medium mb-1">{attr.name}</label>
-                    <select
-                      value={selectedAttributes[attr.id] || ''}
-                      onChange={(e) => {
-                        const valId = e.target.value;
-                        const attrId = attr.id;
-
-                        setSelectedAttributes((prev) => ({
-                          ...prev,
-                          [attrId]: valId,
-                        }));
-                      }}
-                      className="w-full border px-3 py-2 rounded"
-                    >
-                      <option value="">Select a value</option>
-                      {attr.values.map((val) => (
-                        <option key={val.id} value={val.id}>
-                          {val.value}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
+            {selectedLabelId && labels.find(l=>l.id===selectedLabelId).attributes.map(attr=>(
+              <div key={attr.id} className="mb-3">
+                <label className="block text-sm font-medium mb-1">{attr.name}</label>
+                <select
+                  value={selectedAttributes[attr.id]||''}
+                  onChange={e=>setSelectedAttributes(prev=>({...prev,[attr.id]:+e.target.value}))}
+                  className="w-full border px-3 py-2 rounded"
+                >
+                  <option value="">Select a value</option>
+                  {attr.values.map(v=>(
+                    <option key={v.id} value={v.id}>{v.value}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
 
             {error && <div className="text-red-500 text-sm mb-2">{error}</div>}
 
             <div className="flex justify-end gap-2 mt-4">
               <button
-                onClick={() => {
-                  setShowLabelModal(false);
-                  setEditingRegionId(null);
-                  setSelectedAttributes({});
-                  setError('');
-                }}
-                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
+                onClick={handleDelete}
+                className="flex items-center gap-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
               >
-                Cancel
+                <Trash2 size={16}/> Delete
               </button>
               <button
                 onClick={handleLabelSave}

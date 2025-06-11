@@ -18,4 +18,8 @@ urlpatterns = [
     path('tasks/<int:task_id>/annotations/', views.get_annotations, name='get_annotations'),
     path('tasks/<int:task_id>/save_annotations/', views.save_annotations, name='save_annotations'),  
     path('tasks/<int:task_id>/export_annotations/', views.export_annotations, name='export_annotations'),
+    path('annotations/<int:annotation_id>/', views.delete_annotation, name='delete_annotation'),
+    path('projects/<int:pk>/', views.get_project, name='project-detail'),
+    path('projects/update/<int:pk>/', views.update_project, name='project-update'),
+
 ]

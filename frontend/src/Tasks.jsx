@@ -21,18 +21,20 @@ function Tasks() {
   const filteredTasks = tasks.filter(task => filter === 'All' || task.status === filter);
 
   const exportAnnotations = async (taskId, e) => {
-    e.stopPropagation(); // prevent navigation when clicking export
-    try {
-      const response = await axios.get(`${API_ROUTES.exportAnnotations(taskId)}`, {
-        responseType: 'blob',
-      });
-      const blob = new Blob([response.data], { type: 'application/json' });
-      FileSaver.saveAs(blob, `task_${taskId}_annotations.json`);
-    } catch (err) {
-      console.error('Export failed:', err);
-      alert('Failed to export annotations.');
-    }
-  };
+  e.stopPropagation(); // prevent card click
+
+  try {
+    const response = await axios.get(`${API_ROUTES.exportAnnotations(taskId)}`, {
+      responseType: 'blob',
+    });
+    const blob = new Blob([response.data], { type: 'application/zip' });
+    FileSaver.saveAs(blob, `task_${taskId}_annotations.zip`);
+  } catch (err) {
+    console.error('Export failed:', err);
+    alert('Failed to export annotations.');
+  }
+};
+
 
   return (
     <>

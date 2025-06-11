@@ -10,14 +10,15 @@ export const API_ROUTES = {
   // Project-related routes
   getProjects: `${BASE_URL}/projects/`,
   createProject: `${BASE_URL}/projects/create/`,
-  getProjectById: (projectId) => `${BASE_URL}/projects/${projectId}/`,
-  updateProject: (projectId) => `${BASE_URL}/projects/update/${projectId}/`,
+  getProjectById: (projectId) => `${BASE_URL}/projects/${projectId}/`,  // ✅ already correct
+  updateProject: (projectId) => `${BASE_URL}/projects/update/${projectId}/`,  // ✅ used in edit
   deleteProject: (projectId) => `${BASE_URL}/projects/delete/${projectId}/`,
 
   // Task-related routes
-  getTasks: `${BASE_URL}/tasks/`,  // GET all tasks
-  getTask: (taskId) => `${BASE_URL}/task/${taskId}/`, 
+  getTasks: `${BASE_URL}/tasks/`,
+  getTask: (taskId) => `${BASE_URL}/task/${taskId}/`,
   getAnnotations: (taskId) => `${BASE_URL}/tasks/${taskId}/annotations/`,
   saveAnnotations: (taskId) => `${BASE_URL}/tasks/${taskId}/save_annotations/`,
   exportAnnotations: (taskId) => `${BASE_URL}/tasks/${taskId}/export_annotations/`,
+  deleteAnnotation: (annotationId) => `${BASE_URL}/annotations/${annotationId}/`,
 };

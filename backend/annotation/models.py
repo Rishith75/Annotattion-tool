@@ -15,6 +15,7 @@ class Project(models.Model):
     data_type = models.CharField(max_length=20, choices=[('train', 'Train'), ('test', 'Test'), ('validation', 'Validation')])
     display_waveform = models.BooleanField(default=False)
     display_spectrogram = models.BooleanField(default=False)
+    optimize = models.BooleanField(default=False)
     degree = models.IntegerField(default=1)
 
     def __str__(self):
