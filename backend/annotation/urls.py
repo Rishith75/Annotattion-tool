@@ -17,4 +17,5 @@ urlpatterns = [
     path('task/<int:task_id>/', views.get_task, name='get_task'),  
     path('tasks/<int:task_id>/annotations/', views.get_annotations, name='get_annotations'),
     path('tasks/<int:task_id>/save_annotations/', views.save_annotations, name='save_annotations'),  
+    path('tasks/<int:task_id>/export_annotations/', views.export_annotations, name='export_annotations'),
 ]

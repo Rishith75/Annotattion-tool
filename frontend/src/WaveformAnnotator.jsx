@@ -9,6 +9,8 @@ const WaveformAnnotator = ({ audioUrl, labels, initialAnnotations, onAnnotations
   const [selectedLabelId, setSelectedLabelId] = useState('');
   const [selectedAttributes, setSelectedAttributes] = useState({});
   const [showLabelModal, setShowLabelModal] = useState(false);
+  const [error, setError] = useState('');
+  const [isAudioReady, setIsAudioReady] = useState(false);
 
   const waveformRef = useRef(null);
   const wavesurfer = useRef(null);
@@ -49,6 +51,7 @@ const WaveformAnnotator = ({ audioUrl, labels, initialAnnotations, onAnnotations
       regionsPlugin.current.enableDragSelection({ color: 'rgba(99, 102, 241, 0.3)' });
 
       wavesurfer.current.load(audioUrl);
+      wavesurfer.current.on('ready', () => setIsAudioReady(true));
     };
 
     initWaveSurfer();
@@ -60,34 +63,40 @@ const WaveformAnnotator = ({ audioUrl, labels, initialAnnotations, onAnnotations
     };
   }, [audioUrl]);
 
+  // ✅ Load annotations when audio is ready and annotations arrive
   useEffect(() => {
-    if (regionsPlugin.current && initialAnnotations?.length > 0) {
+    if (isAudioReady && initialAnnotations?.length > 0 && regionsPlugin.current) {
+      const newRegions = {};
+
       initialAnnotations.forEach((ann) => {
         const region = regionsPlugin.current.addRegion({
           start: ann.start_time,
           end: ann.end_time,
           color: 'rgba(34, 197, 94, 0.3)',
+          drag: true,
+          resize: true,
           data: { annotationId: ann.id },
         });
 
-        setRegions((prev) => ({
-          ...prev,
-          [region.id]: {
-            label: ann.label_id,
-            attributes: ann.attributes.reduce((acc, val) => {
-              acc[val.attribute_id] = val.value_id;
-              return acc;
-            }, {}),
-          },
-        }));
+        newRegions[region.id] = {
+          label: ann.label_id,
+          attributes: Array.isArray(ann.attributes)
+            ? ann.attributes.reduce((acc, val) => {
+                acc[val.attribute_id] = val.value_id;
+                return acc;
+              }, {})
+            : {},
+        };
       });
+
+      setRegions(newRegions);
     }
-  }, [initialAnnotations]);
+  }, [isAudioReady, initialAnnotations]);
 
   useEffect(() => {
     if (editingRegionId && regions[editingRegionId]) {
-      setSelectedLabelId(regions[editingRegionId].label);
-      setSelectedAttributes(regions[editingRegionId].attributes);
+      setSelectedLabelId(regions[editingRegionId].label || '');
+      setSelectedAttributes(regions[editingRegionId].attributes || {});
     }
   }, [editingRegionId]);
 
@@ -96,20 +105,19 @@ const WaveformAnnotator = ({ audioUrl, labels, initialAnnotations, onAnnotations
 
     setSelectedRegion(region);
     setEditingRegionId(region.id);
-
-    if (existing) {
-      setSelectedLabelId(existing.label);
-      setSelectedAttributes(existing.attributes);
-    } else {
-      setSelectedLabelId('');
-      setSelectedAttributes({});
-    }
-
+    setSelectedLabelId(existing?.label || '');
+    setSelectedAttributes(existing?.attributes || {});
+    setError('');
     setShowLabelModal(true);
   };
 
   const handleLabelSave = () => {
-    if (!editingRegionId || !selectedLabelId) return;
+    if (!editingRegionId) return;
+
+    if (!selectedLabelId) {
+      setError('Label is required.');
+      return;
+    }
 
     const region = regionsPlugin.current.getRegions().find((r) => r.id === editingRegionId);
     if (region) {
@@ -119,17 +127,27 @@ const WaveformAnnotator = ({ audioUrl, labels, initialAnnotations, onAnnotations
       });
     }
 
+    const updatedRegions = {
+      ...regions,
+      [editingRegionId]: {
+        label: selectedLabelId,
+        attributes: selectedAttributes,
+      },
+    };
+
+    setRegions(updatedRegions);
     setShowLabelModal(false);
     setEditingRegionId(null);
     setSelectedLabelId('');
     setSelectedAttributes({});
+    setError('');
 
-    const outputAnnotations = Object.entries(regions).map(([id, value]) => {
+    const outputAnnotations = Object.entries(updatedRegions).map(([id, value]) => {
       const r = regionsPlugin.current.getRegions().find((r) => r.id === id);
       return {
         start_time: r.start,
         end_time: r.end,
-        label_id: value.label,
+        label_id: parseInt(value.label),
         attributes: Object.entries(value.attributes).map(([attrId, valId]) => ({
           attribute_id: parseInt(attrId),
           value_id: parseInt(valId),
@@ -181,23 +199,15 @@ const WaveformAnnotator = ({ audioUrl, labels, initialAnnotations, onAnnotations
               {regions[editingRegionId] ? 'Edit Annotation' : 'Add Annotation'}
             </h3>
 
-            {/* Label Selection */}
-            <label className="block text-sm font-medium mb-1">Label</label>
+            <label className="block text-sm font-medium mb-1">Label *</label>
             <select
               value={selectedLabelId}
               onChange={(e) => {
                 const labelId = parseInt(e.target.value);
                 setSelectedLabelId(labelId);
                 setSelectedAttributes({});
-                setRegions((prev) => ({
-                  ...prev,
-                  [editingRegionId]: {
-                    label: labelId,
-                    attributes: {},
-                  },
-                }));
               }}
-              className="w-full border px-3 py-2 rounded mb-4"
+              className="w-full border px-3 py-2 rounded mb-2"
             >
               <option value="">Select a label</option>
               {labels.map((label) => (
@@ -207,7 +217,6 @@ const WaveformAnnotator = ({ audioUrl, labels, initialAnnotations, onAnnotations
               ))}
             </select>
 
-            {/* Attribute Selection */}
             {selectedLabelId &&
               labels
                 .find((l) => l.id === selectedLabelId)
@@ -224,17 +233,6 @@ const WaveformAnnotator = ({ audioUrl, labels, initialAnnotations, onAnnotations
                           ...prev,
                           [attrId]: valId,
                         }));
-
-                        setRegions((prev) => ({
-                          ...prev,
-                          [editingRegionId]: {
-                            ...prev[editingRegionId],
-                            attributes: {
-                              ...prev[editingRegionId]?.attributes,
-                              [attrId]: valId,
-                            },
-                          },
-                        }));
                       }}
                       className="w-full border px-3 py-2 rounded"
                     >
@@ -248,12 +246,15 @@ const WaveformAnnotator = ({ audioUrl, labels, initialAnnotations, onAnnotations
                   </div>
                 ))}
 
+            {error && <div className="text-red-500 text-sm mb-2">{error}</div>}
+
             <div className="flex justify-end gap-2 mt-4">
               <button
                 onClick={() => {
                   setShowLabelModal(false);
                   setEditingRegionId(null);
                   setSelectedAttributes({});
+                  setError('');
                 }}
                 className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
               >

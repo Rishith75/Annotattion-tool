@@ -18,5 +18,6 @@ export const API_ROUTES = {
   getTasks: `${BASE_URL}/tasks/`,  // GET all tasks
   getTask: (taskId) => `${BASE_URL}/task/${taskId}/`, 
   getAnnotations: (taskId) => `${BASE_URL}/tasks/${taskId}/annotations/`,
-  saveAnnotations: (taskId) => `${BASE_URL}/tasks/${taskId}/save_annotations/`,  // POST to save annotations for a task
+  saveAnnotations: (taskId) => `${BASE_URL}/tasks/${taskId}/save_annotations/`,
+  exportAnnotations: (taskId) => `${BASE_URL}/tasks/${taskId}/export_annotations/`,
 };

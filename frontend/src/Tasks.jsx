@@ -1,8 +1,9 @@
 /* Tasks.jsx */
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Container, Row, Col, Card, Navbar, Nav, Image, Form } from 'react-bootstrap';
+import { Container, Row, Col, Card, Navbar, Nav, Image, Form, Button } from 'react-bootstrap';
 import axios from 'axios';
+import FileSaver from 'file-saver';
 import { API_ROUTES } from './api';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
@@ -18,6 +19,20 @@ function Tasks() {
   }, []);
 
   const filteredTasks = tasks.filter(task => filter === 'All' || task.status === filter);
+
+  const exportAnnotations = async (taskId, e) => {
+    e.stopPropagation(); // prevent navigation when clicking export
+    try {
+      const response = await axios.get(`${API_ROUTES.exportAnnotations(taskId)}`, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'application/json' });
+      FileSaver.saveAs(blob, `task_${taskId}_annotations.json`);
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert('Failed to export annotations.');
+    }
+  };
 
   return (
     <>
@@ -57,6 +72,13 @@ function Tasks() {
                 <Card.Body>
                   <h5>Task #{task.id}</h5>
                   <p>Status: {task.status}</p>
+                  <Button
+                    variant="outline-secondary"
+                    size="sm"
+                    onClick={(e) => exportAnnotations(task.id, e)}
+                  >
+                    Export
+                  </Button>
                 </Card.Body>
               </Card>
             </Col>

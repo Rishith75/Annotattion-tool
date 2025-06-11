@@ -8,6 +8,7 @@ class User(models.Model):
 
     def __str__(self):
         return self.username
+
 class Project(models.Model):
     user = models.ForeignKey('User', on_delete=models.CASCADE, related_name='projects')
     name = models.CharField(max_length=255)
@@ -36,23 +37,6 @@ class AudioFile(models.Model):
     file = models.FileField(upload_to='audio/')
     optimized = models.BooleanField(default=False)
 
-class Annotation(models.Model):
-    task = models.ForeignKey('Task', on_delete=models.CASCADE, related_name='annotations')
-    label = models.ForeignKey('Label', on_delete=models.CASCADE)
-    start_time = models.FloatField()  # In seconds
-    end_time = models.FloatField()    # In seconds
-
-    def __str__(self):
-        return f"{self.label.name} [{self.start_time} - {self.end_time}]"
-
-class AnnotationAttributeValue(models.Model):
-    annotation = models.ForeignKey(Annotation, on_delete=models.CASCADE, related_name='attribute_values')
-    attribute = models.ForeignKey(Attribute, on_delete=models.CASCADE)
-    value = models.ForeignKey(AttributeValue, on_delete=models.CASCADE)
-
-    def __str__(self):
-        return f"{self.attribute.name}: {self.value.value}"
-
 class Task(models.Model):
     STATUS_CHOICES = [
         ('New', 'New'),
@@ -67,3 +51,20 @@ class Task(models.Model):
     def __str__(self):
         return f"Task for {self.audio_file.file.name} in project {self.project.name} [{self.status}]"
 
+class Annotation(models.Model):
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='annotations')
+    label = models.ForeignKey(Label, on_delete=models.CASCADE, null=True, blank=True)  # optional label
+    start_time = models.FloatField()  # In seconds
+    end_time = models.FloatField()    # In seconds
+
+    def __str__(self):
+        label_name = self.label.name if self.label else "No Label"
+        return f"{label_name} [{self.start_time} - {self.end_time}]"
+
+class AnnotationAttributeValue(models.Model):
+    annotation = models.ForeignKey(Annotation, on_delete=models.CASCADE, related_name='attribute_values')
+    attribute = models.ForeignKey(Attribute, on_delete=models.CASCADE)
+    value = models.ForeignKey(AttributeValue, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"{self.attribute.name}: {self.value.value}"

@@ -13,6 +13,7 @@
     "axios": "^1.9.0",
     "bootstrap": "^5.3.6",
     "bootstrap-icons": "^1.13.1",
+    "file-saver": "^2.0.5",
     "konva": "^9.3.20",
     "lucide-react": "^0.513.0",
     "peaks.js": "^3.4.2",
