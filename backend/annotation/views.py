@@ -13,6 +13,7 @@ import tempfile
 from django.http import FileResponse
 from pydub import AudioSegment
 from django.conf import settings
+import random
 
 @api_view(['GET'])
 def get_users(request):
@@ -58,8 +59,6 @@ def update_user(request, pk):
         return Response(serializer.data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# views.py
-
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser])
 def create_project(request):
@@ -94,7 +93,6 @@ def create_project(request):
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(['GET'])
 def get_project(request, pk):
     try:
@@ -105,7 +103,6 @@ def get_project(request, pk):
     # Include context here too
     serializer = ProjectSerializer(project, context={'request': request})
     return Response(serializer.data)
-
 
 @api_view(['PUT'])
 def update_project(request, pk):
@@ -126,14 +123,11 @@ def update_project(request, pk):
         return Response(serializer.data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(['GET'])
 def list_projects(request):
     projects = Project.objects.all()
     serializer = ProjectSerializer(projects, many=True)
     return Response(serializer.data)
-
-
 
 @api_view(['DELETE'])
 def delete_project(request, pk):
@@ -250,7 +244,6 @@ def get_annotations(request, task_id):
     except Task.DoesNotExist:
         return Response({'error': 'Task not found'}, status=status.HTTP_404_NOT_FOUND)
 
-
 @csrf_exempt
 def export_annotations(request, task_id):
     try:
@@ -325,3 +318,104 @@ def delete_annotation(request, annotation_id):
         return Response({'error': 'Annotation not found'}, status=status.HTTP_404_NOT_FOUND)
 
 
+
+def generate_auto_annotations(audio_file_path, project, duration):
+    """
+    Generates 2 dummy annotations (0.5s each) with random labels and attributes.
+    Replace this logic with ML predictions in the future.
+
+    Returns:
+        List of annotation dicts:
+        [
+            {
+                'start_time': 0.0,
+                'end_time': 0.5,
+                'label': Label instance,
+                'attributes': [
+                    {'attribute': Attribute instance, 'value': AttributeValue instance},
+                    ...
+                ]
+            },
+            ...
+        ]
+    """
+    annotations = []
+    used_ranges = []
+
+    labels = list(project.labels.all())
+    if not labels:
+        raise ValueError("No labels in project")
+
+    for _ in range(2):
+        while True:
+            start_time = round(random.uniform(0, duration - 0.5), 2)
+            end_time = round(start_time + 0.5, 2)
+            if all(not (start_time < u_end and end_time > u_start) for u_start, u_end in used_ranges):
+                used_ranges.append((start_time, end_time))
+                break
+
+        label = random.choice(labels)
+        attributes = []
+
+        for attr in label.attributes.all():
+            values = list(attr.values.all())
+            if values:
+                attributes.append({
+                    'attribute': attr,
+                    'value': random.choice(values)
+                })
+
+        annotations.append({
+            'start_time': start_time,
+            'end_time': end_time,
+            'label': label,
+            'attributes': attributes
+        })
+
+    return annotations
+
+@api_view(['POST'])
+def auto_annotate(request, task_id):
+    try:
+        task = Task.objects.get(pk=task_id)
+        audio_file_path = task.audio_file.file.path
+        project = task.project
+
+        # Load audio
+        audio = AudioSegment.from_file(audio_file_path)
+        duration = len(audio) / 1000.0
+
+        if duration < 1:
+            return Response({'error': 'Audio too short for auto annotation'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Clear existing annotations
+        task.annotations.all().delete()
+
+        try:
+            generated = generate_auto_annotations(audio_file_path, project, duration)
+        except ValueError as ve:
+            return Response({'error': str(ve)}, status=status.HTTP_400_BAD_REQUEST)
+
+        for ann in generated:
+            annotation = Annotation.objects.create(
+                task=task,
+                label=ann['label'],
+                start_time=ann['start_time'],
+                end_time=ann['end_time']
+            )
+            for attr_val in ann['attributes']:
+                AnnotationAttributeValue.objects.create(
+                    annotation=annotation,
+                    attribute=attr_val['attribute'],
+                    value=attr_val['value']
+                )
+
+        task.status = 'In Progress'
+        task.save()
+
+        return Response({'message': 'Auto annotations created successfully'}, status=status.HTTP_200_OK)
+
+    except Task.DoesNotExist:
+        return Response({'error': 'Task not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

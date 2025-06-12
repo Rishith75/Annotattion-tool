@@ -21,5 +21,6 @@ urlpatterns = [
     path('annotations/<int:annotation_id>/', views.delete_annotation, name='delete_annotation'),
     path('projects/<int:pk>/', views.get_project, name='project-detail'),
     path('projects/update/<int:pk>/', views.update_project, name='project-update'),
+    path('tasks/<int:task_id>/auto_annotate/', views.auto_annotate, name='auto_annotate'),
 
 ]

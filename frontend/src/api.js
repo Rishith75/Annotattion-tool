@@ -21,4 +21,5 @@ export const API_ROUTES = {
   saveAnnotations: (taskId) => `${BASE_URL}/tasks/${taskId}/save_annotations/`,
   exportAnnotations: (taskId) => `${BASE_URL}/tasks/${taskId}/export_annotations/`,
   deleteAnnotation: (annotationId) => `${BASE_URL}/annotations/${annotationId}/`,
+  autoAnnotate: (taskId) => `${BASE_URL}/tasks/${taskId}/auto_annotate/`,
 };

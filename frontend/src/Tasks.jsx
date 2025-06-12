@@ -1,7 +1,6 @@
-/* Tasks.jsx */
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Container, Row, Col, Card, Navbar, Nav, Image, Form, Button } from 'react-bootstrap';
+import { Container, Row, Col, Card, Navbar, Nav, Image, Form, Button, Spinner } from 'react-bootstrap';
 import axios from 'axios';
 import FileSaver from 'file-saver';
 import { API_ROUTES } from './api';
@@ -11,6 +10,7 @@ function Tasks() {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState([]);
   const [filter, setFilter] = useState('All');
+  const [loadingTaskId, setLoadingTaskId] = useState(null); // to show loading during auto-annotate
 
   useEffect(() => {
     axios.get(API_ROUTES.getTasks)
@@ -21,20 +21,35 @@ function Tasks() {
   const filteredTasks = tasks.filter(task => filter === 'All' || task.status === filter);
 
   const exportAnnotations = async (taskId, e) => {
-  e.stopPropagation(); // prevent card click
+    e.stopPropagation(); // prevent card click
+    try {
+      const response = await axios.get(API_ROUTES.exportAnnotations(taskId), {
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'application/zip' });
+      FileSaver.saveAs(blob, `task_${taskId}_annotations.zip`);
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert('Failed to export annotations.');
+    }
+  };
 
-  try {
-    const response = await axios.get(`${API_ROUTES.exportAnnotations(taskId)}`, {
-      responseType: 'blob',
-    });
-    const blob = new Blob([response.data], { type: 'application/zip' });
-    FileSaver.saveAs(blob, `task_${taskId}_annotations.zip`);
-  } catch (err) {
-    console.error('Export failed:', err);
-    alert('Failed to export annotations.');
-  }
-};
-
+  const autoAnnotate = async (taskId, e) => {
+    e.stopPropagation(); // prevent card click
+    setLoadingTaskId(taskId);
+    try {
+      const response = await axios.post(API_ROUTES.autoAnnotate(taskId));
+      alert('Auto annotations created successfully!');
+      // Refresh task list to update status
+      const refreshedTasks = await axios.get(API_ROUTES.getTasks);
+      setTasks(refreshedTasks.data);
+    } catch (err) {
+      console.error('Auto annotation failed:', err);
+      alert('Auto annotation failed.');
+    } finally {
+      setLoadingTaskId(null);
+    }
+  };
 
   return (
     <>
@@ -74,13 +89,23 @@ function Tasks() {
                 <Card.Body>
                   <h5>Task #{task.id}</h5>
                   <p>Status: {task.status}</p>
-                  <Button
-                    variant="outline-secondary"
-                    size="sm"
-                    onClick={(e) => exportAnnotations(task.id, e)}
-                  >
-                    Export
-                  </Button>
+                  <div className="d-flex gap-2">
+                    <Button
+                      variant="outline-secondary"
+                      size="sm"
+                      onClick={(e) => exportAnnotations(task.id, e)}
+                    >
+                      Export
+                    </Button>
+                    <Button
+                      variant="outline-primary"
+                      size="sm"
+                      onClick={(e) => autoAnnotate(task.id, e)}
+                      disabled={loadingTaskId === task.id}
+                    >
+                      {loadingTaskId === task.id ? <Spinner size="sm" animation="border" /> : 'Auto Annotate'}
+                    </Button>
+                  </div>
                 </Card.Body>
               </Card>
             </Col>
