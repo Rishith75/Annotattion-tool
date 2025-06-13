@@ -79,8 +79,18 @@ class ProjectSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         labels_data = validated_data.pop('labels', [])
         project = Project.objects.create(**validated_data)
-        # (same as before) …
+
+        for label_data in labels_data:
+            attributes_data = label_data.pop('attributes', [])
+            label = Label.objects.create(project=project, **label_data)
+            for attribute_data in attributes_data:
+                values_data = attribute_data.pop('values', [])
+                attribute = Attribute.objects.create(label=label, **attribute_data)
+                for val in values_data:
+                    AttributeValue.objects.create(attribute=attribute, value=val)
+        
         return project
+
 
     def update(self, instance, validated_data):
         # 1) Pop off labels if provided
