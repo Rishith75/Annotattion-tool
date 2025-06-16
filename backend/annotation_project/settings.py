@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-fydefub)b*p1zm6)waj-y5b-=ymjl8a4y2-@lz_e(a@%gi$^4d
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -53,9 +53,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-]
+CORS_ALLOW_ALL_ORIGINS = True
+
 
 
 ROOT_URLCONF = 'annotation_project.urls'
