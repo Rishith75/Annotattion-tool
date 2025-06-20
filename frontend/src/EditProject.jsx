@@ -11,11 +11,12 @@ import {
 } from 'react-bootstrap';
 import axios from 'axios';
 import { API_ROUTES } from './api';
+import { Navbar, Nav, Image } from 'react-bootstrap';
+
 
 function EditProject() {
   const navigate = useNavigate();
   const { id } = useParams();
-
   const [projectName, setProjectName] = useState('');
   const [dataType, setDataType] = useState('train');
   const [displayWaveform, setDisplayWaveform] = useState(false);
@@ -23,42 +24,51 @@ function EditProject() {
   const [optimize, setOptimize] = useState(false);
   const [degree, setDegree] = useState(1);
   const [labels, setLabels] = useState([]);
+  const [allAnnotators, setAllAnnotators] = useState([]);
+  const [selectedAnnotators, setSelectedAnnotators] = useState([]);
+  const user = JSON.parse(localStorage.getItem('user'));
 
   useEffect(() => {
-  axios.get(API_ROUTES.getProjectById(id))
-    .then((res) => {
-      const p = res.data;
-      setProjectName(p.name);
-      setDataType(p.data_type);
-      setDisplayWaveform(p.display_waveform);
-      setDisplaySpectrogram(p.display_spectrogram);
-      setOptimize(p.optimize);
-      setDegree(p.degree);
+    axios.get(API_ROUTES.getProjectById(id))
+      .then((res) => {
+        const p = res.data;
+        setProjectName(p.name);
+        setDataType(p.data_type);
+        setDisplayWaveform(p.display_waveform);
+        setDisplaySpectrogram(p.display_spectrogram);
+        setOptimize(p.optimize);
+        setDegree(p.degree);
 
-      // Normalize each attribute’s values array from [{id,value},…] to ['value',…]
-      const normalizedLabels = (p.labels || []).map(label => ({
-        name: label.name,
-        attributes: (label.attributes || []).map(attr => ({
-          name: attr.name,
-          values: (attr.values || []).map(v => 
-            typeof v === 'string' ? v : v.value
-          )
-        }))
-      }));
-      setLabels(normalizedLabels);
-    })
-    .catch((err) => {
-      console.error('Error fetching project:', err);
-      alert('Could not load project.');
-    });
-}, [id]);
+        const normalizedLabels = (p.labels || []).map(label => ({
+          name: label.name,
+          attributes: (label.attributes || []).map(attr => ({
+            name: attr.name,
+            values: (attr.values || []).map(v =>
+              typeof v === 'string' ? v : v.value
+            )
+          }))
+        }));
+        setLabels(normalizedLabels);
+        setSelectedAnnotators(p.assigned_annotators || []);
+      })
+      .catch((err) => {
+        console.error('Error fetching project:', err);
+        alert('Could not load project.');
+      });
 
+    axios.get('http://localhost:8000/api/users/')
+      .then(res => {
+        const annotators = res.data.filter(u => u.role === 'annotator');
+        setAllAnnotators(annotators);
+      });
+  }, [id]);
 
   const handleLabelNameChange = (li, v) => {
     const L = [...labels];
     L[li].name = v;
     setLabels(L);
   };
+
   const addLabel = () => setLabels([...labels, { name: '', attributes: [] }]);
   const removeLabel = (li) => {
     const L = [...labels]; L.splice(li, 1); setLabels(L);
@@ -93,6 +103,7 @@ function EditProject() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     const cleanedLabels = labels.map(l => ({
       name: l.name || '',
       attributes: (l.attributes || []).map(a => ({
@@ -110,19 +121,63 @@ function EditProject() {
         optimize,
         degree,
         labels: cleanedLabels,
+        ...(user.role === 'manager' && { assigned_annotators: selectedAnnotators }), // only send if manager
       });
-      navigate('/home');
+
+      navigate('/projects');
     } catch (err) {
       console.error('Error updating project:', err.response?.data || err);
       alert('Update failed — check console for details.');
     }
   };
 
+  const userRole = user?.role;
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    navigate('/');
+  };
+
   return (
     <Container className="mt-4">
+      <Navbar bg="light" expand="lg" className="mb-4">
+        <Container>
+          <Navbar.Brand
+            style={{ cursor: 'pointer' }}
+            onClick={() => navigate(userRole === 'manager' ? '/superprojects' : '/projects')}
+          >
+            Annotation Tool
+          </Navbar.Brand>
+
+          <Nav className="me-auto">
+            {userRole === 'manager' && (
+              <Nav.Link onClick={() => navigate('/superprojects')}>Super Projects</Nav.Link>
+            )}
+
+            {(userRole === 'manager' || userRole === 'annotator') && (
+              <Nav.Link onClick={() => navigate('/projects')}>Projects</Nav.Link>
+            )}
+
+            <Nav.Link onClick={() => navigate('/tasks')}>Tasks</Nav.Link>
+          </Nav>
+
+          <Image
+            src="https://cdn-icons-png.flaticon.com/512/847/847969.png"
+            roundedCircle
+            width={40}
+            height={40}
+            style={{ cursor: 'pointer' }}
+            onClick={() => navigate('/profile')}
+          />
+          <Nav.Link onClick={handleLogout} className="ms-3 text-danger">
+            Logout
+          </Nav.Link>
+        </Container>
+      </Navbar>
+
+
       <h3>Edit Project</h3>
       <Form onSubmit={handleSubmit}>
-        {/* Name */}
         <Form.Group className="mb-3" controlId="projectName">
           <Form.Label>Project Name</Form.Label>
           <Form.Control
@@ -133,7 +188,6 @@ function EditProject() {
           />
         </Form.Group>
 
-        {/* Data Type */}
         <Form.Group className="mb-3" controlId="dataType">
           <Form.Label>Data Type</Form.Label>
           <Form.Select
@@ -146,7 +200,6 @@ function EditProject() {
           </Form.Select>
         </Form.Group>
 
-        {/* Waveform / Spectrogram */}
         <Form.Group className="mb-3">
           <Form.Check
             type="checkbox"
@@ -162,7 +215,6 @@ function EditProject() {
           />
         </Form.Group>
 
-        {/* Optimize */}
         <Form.Group className="mb-3">
           <Form.Check
             type="checkbox"
@@ -238,7 +290,6 @@ function EditProject() {
           </Button>
         </Form.Group>
 
-        {/* Degree */}
         <Form.Group className="mb-3" controlId="degree">
           <Form.Label>Degree</Form.Label>
           <Form.Control
@@ -249,6 +300,28 @@ function EditProject() {
             required
           />
         </Form.Group>
+
+        {/* 🔒 Only managers can assign annotators */}
+        {user?.role === 'manager' && (
+          <Form.Group className="mb-3">
+            <Form.Label>Assign Annotators</Form.Label>
+            {allAnnotators.map(user => (
+              <Form.Check
+                key={user.id}
+                type="checkbox"
+                label={user.username}
+                checked={selectedAnnotators.includes(user.id)}
+                onChange={() => {
+                  if (selectedAnnotators.includes(user.id)) {
+                    setSelectedAnnotators(selectedAnnotators.filter(id => id !== user.id));
+                  } else {
+                    setSelectedAnnotators([...selectedAnnotators, user.id]);
+                  }
+                }}
+              />
+            ))}
+          </Form.Group>
+        )}
 
         <Button variant="primary" type="submit">
           Update Project

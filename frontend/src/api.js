@@ -22,4 +22,5 @@ export const API_ROUTES = {
   exportAnnotations: (taskId) => `${BASE_URL}/tasks/${taskId}/export_annotations/`,
   deleteAnnotation: (annotationId) => `${BASE_URL}/annotations/${annotationId}/`,
   autoAnnotate: (taskId) => `${BASE_URL}/tasks/${taskId}/auto_annotate/`,
+  exportProjectAnnotations: (projectId) => `${BASE_URL}/projects/${projectId}/export/`,
 };

@@ -11,10 +11,19 @@ import {
 } from 'react-bootstrap';
 import axios from 'axios';
 import { API_ROUTES } from './api';
+import { useLocation } from 'react-router-dom';
+import { ListGroup } from 'react-bootstrap';
+import { Navbar, Nav, Image } from 'react-bootstrap';
+
+
 
 function CreateProject() {
   const navigate = useNavigate();
-
+  const location = useLocation();
+const queryParams = new URLSearchParams(location.search);
+const superProjectId = queryParams.get('super_project_id');
+const stateAnnotators = location.state?.annotators || [];
+const [selectedAnnotators, setSelectedAnnotators] = useState([]); // none selected by default
   const [projectName, setProjectName] = useState('');
   const [dataType, setDataType] = useState('train');
   const [displayWaveform, setDisplayWaveform] = useState(false);
@@ -74,6 +83,12 @@ function CreateProject() {
     setAudioFiles(e.target.files);
   };
 
+  const toggleAnnotator = (uid) => {
+    setSelectedAnnotators((prev) =>
+      prev.includes(uid) ? prev.filter((id) => id !== uid) : [...prev, uid]
+    );
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -91,6 +106,9 @@ function CreateProject() {
     formData.append('optimize', optimize.toString());
     formData.append('degree', degree.toString());
     formData.append('user', user.id);
+    formData.append('super_project', superProjectId);
+
+    selectedAnnotators.forEach((uid) => formData.append('assigned_annotators', uid));
 
     Array.from(audioFiles).forEach((file) => {
       formData.append('audio_files', file);
@@ -110,15 +128,57 @@ function CreateProject() {
       await axios.post(API_ROUTES.createProject, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      navigate('/home');
+      navigate('/projects');
     } catch (error) {
       console.error('Error creating project:', error.response?.data || error);
       alert('Failed to create project. Check console for details.');
     }
   };
 
+  const user = JSON.parse(localStorage.getItem('user'));
+const userRole = user?.role;
+
+
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    navigate('/');
+  };
+
   return (
     <Container className="mt-4">
+      <Navbar bg="light" expand="lg" className="mb-4">
+        <Container>
+          <Navbar.Brand
+            style={{ cursor: 'pointer' }}
+            onClick={() => navigate(userRole === 'manager' ? '/superprojects' : '/projects')}
+          >
+            Annotation Tool
+          </Navbar.Brand>
+
+          <Nav className="me-auto">
+            {userRole === 'manager' && (
+              <Nav.Link onClick={() => navigate('/superprojects')}>Super Projects</Nav.Link>
+            )}
+
+            {(userRole === 'manager' || userRole === 'annotator') && (
+              <Nav.Link onClick={() => navigate('/projects')}>Projects</Nav.Link>
+            )}
+
+            <Nav.Link active>Tasks</Nav.Link>
+          </Nav>
+
+          <Image
+            src="https://cdn-icons-png.flaticon.com/512/847/847969.png"
+            roundedCircle
+            width={40}
+            height={40}
+            style={{ cursor: 'pointer' }}
+            onClick={() => navigate('/profile')}
+          />
+          <Nav.Link onClick={handleLogout} className="ms-3 text-danger">Logout</Nav.Link>
+        </Container>
+      </Navbar>
+
       <h3>Create Project</h3>
       <Form onSubmit={handleSubmit}>
         <Form.Group className="mb-3" controlId="projectName">
@@ -283,6 +343,27 @@ function CreateProject() {
             onChange={(e) => setDegree(Number(e.target.value))}
             required
           />
+        </Form.Group>
+        {/* 🔥 Assign Annotators */}
+        <Form.Group className="mb-4">
+          <Form.Label>Assign Annotators</Form.Label>
+          {stateAnnotators.length === 0 ? (
+            <p className="text-muted">No annotators found in this super project.</p>
+          ) : (
+              <ListGroup>
+              {stateAnnotators.map((annotator) => (
+                <ListGroup.Item key={annotator.id}>
+                  <Form.Check
+                    type="checkbox"
+                    label={annotator.username}
+                    checked={selectedAnnotators.includes(annotator.id)}
+                    onChange={() => toggleAnnotator(annotator.id)}
+                  />
+                </ListGroup.Item>
+              ))}
+            </ListGroup>
+
+          )}
         </Form.Group>
 
         <Button variant="primary" type="submit">

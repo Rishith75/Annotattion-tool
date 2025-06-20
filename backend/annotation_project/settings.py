@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'annotation',
     'corsheaders',
 ]
+AUTH_USER_MODEL = 'annotation.User'
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',

@@ -8,10 +8,11 @@ function Signup() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [formData, setFormData] = useState({
     full_name: '',
-    user_name: '',
+    username: '',
     email: '',
     password: '',
     confirmPassword: '',
+    role: 'annotator', // Default role
   });
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -28,7 +29,7 @@ function Signup() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const { full_name, user_name, email, password, confirmPassword } = formData;
+    const { full_name, username, email, password, confirmPassword, role } = formData;
 
     if (password !== confirmPassword) {
       setError('Passwords do not match.');
@@ -44,14 +45,16 @@ function Signup() {
       const res = await fetch(API_ROUTES.createUser, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ full_name, user_name, email, password }),
+        body: JSON.stringify({ full_name, username, email, password, role }),
       });
 
       if (res.ok) {
         navigate('/signin');
       } else {
         const data = await res.json();
-        setError(data.detail || 'Something went wrong. Try again.');
+        setError(
+          data.detail || Object.values(data).flat().join(', ') || 'Something went wrong.'
+        );
       }
     } catch (err) {
       console.error(err);
@@ -60,19 +63,13 @@ function Signup() {
   };
 
   return (
-    <div
-      className="d-flex align-items-center justify-content-center bg-light"
-      style={{ height: '700px', width: '100%', padding: '1rem' }}
-    >
-      <div
-        className="card p-4 shadow rounded-4"
-        style={{ width: '500px', minHeight: '550px' }}
-      >
+    <div className="d-flex align-items-center justify-content-center bg-light" style={{ height: '700px', width: '100%', padding: '1rem' }}>
+      <div className="card p-4 shadow rounded-4" style={{ width: '500px', minHeight: '550px' }}>
         <h2 className="text-center mb-4">Sign Up</h2>
         <form onSubmit={handleSubmit}>
           {[
             { label: 'Full Name', type: 'text', field: 'full_name', placeholder: 'Enter full name' },
-            { label: 'Username', type: 'text', field: 'user_name', placeholder: 'Choose a username' },
+            { label: 'Username', type: 'text', field: 'username', placeholder: 'Choose a username' },
             { label: 'Email', type: 'email', field: 'email', placeholder: 'Enter your email' },
           ].map(({ label, type, field, placeholder }, index) => (
             <div className="mb-3 row align-items-center" key={index}>
@@ -89,6 +86,21 @@ function Signup() {
               </div>
             </div>
           ))}
+
+          {/* Role dropdown */}
+          <div className="mb-3 row align-items-center">
+            <label className="col-sm-4 col-form-label text-end">Role:</label>
+            <div className="col-sm-8">
+              <select
+                className="form-control"
+                value={formData.role}
+                onChange={(e) => handleChange('role', e.target.value)}
+              >
+                <option value="annotator">Annotator</option>
+                <option value="manager">Project Manager</option>
+              </select>
+            </div>
+          </div>
 
           <div className="mb-3 row align-items-center position-relative">
             <label className="col-sm-4 col-form-label text-end">Password:</label>

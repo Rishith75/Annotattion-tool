@@ -1,22 +1,37 @@
+from django.contrib.auth.models import AbstractUser
 from django.db import models
 
-class User(models.Model):
-    username = models.CharField(max_length=150, unique=True)
-    password = models.CharField(max_length=128)  # This will be hashed later
+class User(AbstractUser):
+    ROLE_CHOICES = [
+        ('manager', 'Project Manager'),
+        ('annotator', 'Annotator'),
+    ]
     email = models.EmailField(unique=True)
     full_name = models.CharField(max_length=255)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='annotator')
 
+    REQUIRED_FIELDS = ['email', 'full_name', 'role']
+    
     def __str__(self):
         return self.username
+class SuperProject(models.Model):
+    name = models.CharField(max_length=255)
+    manager = models.ForeignKey(User, on_delete=models.CASCADE, related_name='super_projects')
+    annotators = models.ManyToManyField(User, related_name='assigned_super_projects')
+
+    def __str__(self):
+        return self.name
 
 class Project(models.Model):
-    user = models.ForeignKey('User', on_delete=models.CASCADE, related_name='projects')
+    super_project = models.ForeignKey(SuperProject, on_delete=models.CASCADE, related_name='projects')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='projects')  # Creator/manager
     name = models.CharField(max_length=255)
     data_type = models.CharField(max_length=20, choices=[('train', 'Train'), ('test', 'Test'), ('validation', 'Validation')])
     display_waveform = models.BooleanField(default=False)
     display_spectrogram = models.BooleanField(default=False)
     optimize = models.BooleanField(default=False)
     degree = models.IntegerField(default=1)
+    assigned_annotators = models.ManyToManyField(User, related_name='assigned_projects')
 
     def __str__(self):
         return self.name
@@ -44,7 +59,6 @@ class Task(models.Model):
         ('In Progress', 'In Progress'),
         ('Completed', 'Completed'),
     ]
-
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='tasks')
     audio_file = models.ForeignKey(AudioFile, on_delete=models.CASCADE, related_name='tasks')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='New')
@@ -54,9 +68,9 @@ class Task(models.Model):
 
 class Annotation(models.Model):
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='annotations')
-    label = models.ForeignKey(Label, on_delete=models.CASCADE, null=True, blank=True)  # optional label
-    start_time = models.FloatField()  # In seconds
-    end_time = models.FloatField()    # In seconds
+    label = models.ForeignKey(Label, on_delete=models.CASCADE, null=True, blank=True)
+    start_time = models.FloatField()
+    end_time = models.FloatField()
 
     def __str__(self):
         label_name = self.label.name if self.label else "No Label"

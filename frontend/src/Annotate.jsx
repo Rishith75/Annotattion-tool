@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Container, Navbar, Nav, Image, Button, Form } from 'react-bootstrap';
+import { Container, Navbar, Nav, Image, Button, Form, Spinner } from 'react-bootstrap';
 import axios from 'axios';
 import { API_ROUTES } from './api';
 import WaveformAnnotator from './WaveformAnnotator';
@@ -12,19 +12,28 @@ function Annotate() {
   const [task, setTask] = useState(null);
   const [annotations, setAnnotations] = useState([]);
   const [status, setStatus] = useState('New');
+  const [loading, setLoading] = useState(true);
+  const user = JSON.parse(localStorage.getItem('user'));
 
   useEffect(() => {
-    axios.get(API_ROUTES.getTask(id))
-      .then(res => {
-        setTask(res.data);
-        setStatus(res.data.status);
-        return axios.get(API_ROUTES.getAnnotations(id));
-      })
-      .then(res => {
-        console.log("Fetched Annotations:", res.data.annotations);
-        setAnnotations(res.data.annotations);
-      })
-      .catch(err => console.error('Error fetching task or annotations:', err));
+    const fetchTaskAndAnnotations = async () => {
+      try {
+        const taskRes = await axios.get(API_ROUTES.getTask(id));
+        setTask(taskRes.data);
+        setStatus(taskRes.data.status);
+
+        const annoRes = await axios.get(API_ROUTES.getAnnotations(id));
+        console.log("Fetched Annotations:", annoRes.data.annotations);
+        setAnnotations(annoRes.data.annotations);
+      } catch (err) {
+        console.error('Error fetching task or annotations:', err);
+        alert('Failed to load annotation task.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTaskAndAnnotations();
   }, [id]);
 
   const handleSave = () => {
@@ -33,20 +42,52 @@ function Annotate() {
       status,
     })
     .then(() => navigate('/tasks'))
-    .catch(err => console.error('Error saving annotations:', err));
+    .catch(err => {
+      console.error('Error saving annotations:', err);
+      alert('Failed to save annotations.');
+    });
   };
 
-  if (!task) return <div>Loading...</div>;
+  const userRole = user?.role;
+
+const handleLogout = () => {
+  localStorage.removeItem('user');
+  navigate('/');
+};
+
+
+  if (loading || !task) {
+    return (
+      <Container className="text-center mt-5">
+        <Spinner animation="border" role="status" />
+        <p className="mt-2">Loading task...</p>
+      </Container>
+    );
+  }
 
   return (
     <>
       <Navbar bg="light" expand="lg" className="mb-4">
         <Container>
-          <Navbar.Brand>Annotation Tool</Navbar.Brand>
+          <Navbar.Brand
+            style={{ cursor: 'pointer' }}
+            onClick={() => navigate(userRole === 'manager' ? '/superprojects' : '/projects')}
+          >
+            Annotation Tool
+          </Navbar.Brand>
+
           <Nav className="me-auto">
-            <Nav.Link onClick={() => navigate('/')}>Projects</Nav.Link>
+            {userRole === 'manager' && (
+              <Nav.Link onClick={() => navigate('/superprojects')}>Super Projects</Nav.Link>
+            )}
+
+            {(userRole === 'manager' || userRole === 'annotator') && (
+              <Nav.Link onClick={() => navigate('/projects')}>Projects</Nav.Link>
+            )}
+
             <Nav.Link onClick={() => navigate('/tasks')}>Tasks</Nav.Link>
           </Nav>
+
           <Image
             src="https://cdn-icons-png.flaticon.com/512/847/847969.png"
             roundedCircle
@@ -55,21 +96,24 @@ function Annotate() {
             style={{ cursor: 'pointer' }}
             onClick={() => navigate('/profile')}
           />
+          <Nav.Link onClick={handleLogout} className="ms-3 text-danger">
+            Logout
+          </Nav.Link>
         </Container>
       </Navbar>
 
+
       <Container>
         <h4>Task #{task.id}</h4>
-        <p>Status:</p>
-        <Form.Select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          style={{ maxWidth: '200px' }}
-        >
-          <option>New</option>
-          <option>In Progress</option>
-          <option>Completed</option>
-        </Form.Select>
+
+        <Form.Group className="my-3" style={{ maxWidth: '300px' }}>
+          <Form.Label>Status</Form.Label>
+          <Form.Select value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option>New</option>
+            <option>In Progress</option>
+            <option>Completed</option>
+          </Form.Select>
+        </Form.Group>
 
         {task.project.display_spectrogram && (
           <div className="my-3">
@@ -86,7 +130,9 @@ function Annotate() {
           />
         )}
 
-        <Button onClick={handleSave} className="mt-3">Save</Button>
+        <Button onClick={handleSave} className="mt-4">
+          Save
+        </Button>
       </Container>
     </>
   );

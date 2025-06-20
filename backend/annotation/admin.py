@@ -8,7 +8,8 @@ from .models import (
     AudioFile,
     Task,
     Annotation,
-    AnnotationAttributeValue
+    AnnotationAttributeValue,
+    SuperProject,
 )
 
 admin.site.register(User)
@@ -20,3 +21,4 @@ admin.site.register(AudioFile)
 admin.site.register(Task)
 admin.site.register(Annotation)
 admin.site.register(AnnotationAttributeValue)
+admin.site.register(SuperProject)

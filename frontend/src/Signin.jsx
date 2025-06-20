@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import 'bootstrap-icons/font/bootstrap-icons.css';
 import { API_ROUTES } from './api';
+import 'bootstrap-icons/font/bootstrap-icons.css';
 
 function Signin() {
   const [username, setUsername] = useState('');
@@ -10,29 +10,43 @@ function Signin() {
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (user) {
+      if (user.role === 'manager') {
+        navigate('/superprojects');
+      } else {
+        navigate('/projects');
+      }
+    }
+  }, [navigate]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-  
     try {
-      const response = await fetch(API_ROUTES.login, {
+      const res = await fetch(API_ROUTES.login, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password })
       });
-  
-      if (response.ok) {
-        const data = await response.json();
+
+      if (res.ok) {
+        const data = await res.json();
         localStorage.setItem('user', JSON.stringify(data));
-        navigate('/home');
+
+        if (data.role === 'manager') {
+          navigate('/superprojects');
+        } else {
+          navigate('/projects');
+        }
       } else {
-        setError('Invalid credentials. Please try again.');
+        setError('Invalid credentials. Try again.');
       }
-    } catch (err) {
-      setError('Network error. Try again.');
+    } catch {
+      setError('Server error. Try again later.');
     }
   };
-  
 
   return (
     <div className="container-fluid min-vh-100 d-flex justify-content-center align-items-center bg-light">
@@ -42,7 +56,8 @@ function Signin() {
           <div className="mb-3 row align-items-center">
             <label className="col-sm-3 col-form-label text-end">Username:</label>
             <div className="col-sm-9">
-              <input type="text" className="form-control" value={username} onChange={(e) => setUsername(e.target.value)} required />
+              <input type="text" className="form-control" value={username}
+                     onChange={(e) => setUsername(e.target.value)} required />
             </div>
           </div>
 
