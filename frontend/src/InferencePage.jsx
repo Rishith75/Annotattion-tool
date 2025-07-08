@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import Plot from 'react-plotly.js';
 import axios from 'axios';
 import { API_ROUTES } from './api';
+import { useNavigate } from 'react-router-dom';
+import {Navbar,Container,Image,Nav } from 'react-bootstrap';
 
 const featureOptions = [
   { value: 'rms', label: 'RMS' },
@@ -106,7 +108,41 @@ const InferencePage = () => {
     };
   });
 
+  const handleLogout = () => {
+    // Clear authentication data, e.g., remove token from localStorage
+    localStorage.removeItem('authToken');
+    navigate('/login');  // Redirect to login page
+  };
+  
+
   return (
+    <>
+        {/* Navbar */}
+      <Navbar bg="light" expand="lg" className="mb-4">
+        <Container>
+          <Navbar.Brand onClick={() => navigate('/superprojects')} style={{ cursor: 'pointer' }}>
+            Annotation Tool
+          </Navbar.Brand>
+          
+          <Nav className="me-auto">
+            <Nav.Link onClick={() => navigate('/superprojects')}>Super Projects</Nav.Link>
+            <Nav.Link onClick={() => navigate('/projects')}>Projects</Nav.Link>
+            <Nav.Link onClick={() => navigate('/tasks')}>Tasks</Nav.Link>
+            <Nav.Link onClick={() => navigate('/inference')}>Inference</Nav.Link>
+          </Nav>
+
+          <Image
+            src="https://cdn-icons-png.flaticon.com/512/847/847969.png"
+            roundedCircle
+            width={40}
+            height={40}
+            style={{ cursor: 'pointer' }}
+            onClick={() => navigate('/profile')}
+          />
+          <Nav.Link onClick={handleLogout} className="ms-3 text-danger">Logout</Nav.Link>
+        </Container>
+      </Navbar>
+      <Container>
     <div className="container mt-4">
       <h2 className="text-center mb-4">Inference Plot (All Annotations)</h2>
 
@@ -208,9 +244,13 @@ const InferencePage = () => {
           }}
           onClick={handlePointClick}
         />
+      
       )}
     </div>
+    </Container>
+    </>
   );
+
 };
 
 export default InferencePage;
