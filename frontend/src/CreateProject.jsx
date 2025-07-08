@@ -363,26 +363,6 @@ function CreateProject() {
           />
         </Form.Group>
 
-        <Form.Group className="mb-3">
-          <Form.Check
-            type="checkbox"
-            id="optimize"
-            label="Optimize Audio Chunks"
-            checked={optimize}
-            onChange={(e) => setOptimize(e.target.checked)}
-          />
-        </Form.Group>
-
-        <Form.Group className="mb-3" controlId="degree">
-          <Form.Label>Degree (Number of annotators per chunk)</Form.Label>
-          <Form.Control
-            type="number"
-            min={1}
-            value={degree}
-            onChange={(e) => setDegree(Number(e.target.value))}
-            required
-          />
-        </Form.Group>
         {/* 🔥 Assign Annotators */}
         <Form.Group className="mb-4">
           <Form.Label>Assign Annotators</Form.Label>
