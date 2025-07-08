@@ -254,15 +254,6 @@ function EditProject() {
           />
         </Form.Group>
 
-        <Form.Group className="mb-3">
-          <Form.Check
-            type="checkbox"
-            label="Optimize Audio Chunks"
-            checked={optimize}
-            onChange={e => setOptimize(e.target.checked)}
-          />
-        </Form.Group>
-
         <Form.Group className="mb-3" controlId="modelType">
           <Form.Label>Model Type</Form.Label>
           <Form.Select
@@ -342,17 +333,6 @@ function EditProject() {
           <Button variant="secondary" onClick={addLabel}>
             + Add Label
           </Button>
-        </Form.Group>
-
-        <Form.Group className="mb-3" controlId="degree">
-          <Form.Label>Degree</Form.Label>
-          <Form.Control
-            type="number"
-            min={1}
-            value={degree}
-            onChange={e => setDegree(Number(e.target.value))}
-            required
-          />
         </Form.Group>
 
         {/* 🔒 Only managers can assign annotators */}
