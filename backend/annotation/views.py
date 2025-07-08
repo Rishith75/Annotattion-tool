@@ -426,47 +426,55 @@ def save_annotations(request, task_id):
         task = Task.objects.get(pk=task_id)
         data = request.data
 
-        # Keep model-generated annotations intact
         # Clear only user-created annotations (annotations where model_label is null)
-        task.annotations.filter(model_label__isnull=True).delete()
+        # and that are not model-generated (no model_label).
+        # task.annotations.filter(model_label__isnull=True).delete()
+        Annotation.objects.filter(task=task).delete()
 
         annotations = data.get('annotations', [])
         
         # Save or update user annotations
         for ann in annotations:
             label = None
+            print(ann.get('label_id'))
             if ann.get('label_id'):
                 label = Label.objects.filter(pk=ann['label_id']).first()
 
-            # If annotation already exists (user editing it), update it, else create a new one
+            # Check if it's an update (annotation_id exists) or a new one
             annotation = None
-            if ann.get('annotation_id'):  # Check if this is an update
-                annotation = Annotation.objects.filter(pk=ann['annotation_id'], model_label__isnull=True).first()
+            if ann.get('annotation_id'):
+                # Ensure annotation_id is cast to an integer (if passed as a string from frontend)
+                annotation_id = int(ann['annotation_id'])
+                annotation = Annotation.objects.filter(pk=annotation_id, model_label__isnull=True).first()
+
                 if annotation:
-                    # Update existing annotation, keep model_label intact
+                    # Update existing annotation
                     annotation.label = label
                     annotation.start_time = ann['start_time']
                     annotation.end_time = ann['end_time']
-                    annotation.model_label=ann['model_label']
+                    annotation.model_label = ann.get('model_label')  # optional
                     annotation.save()
                 else:
-                    # If no matching annotation found, create a new one
+                    # If no matching annotation found for update, create a new one
+                    print('hi')
                     annotation = Annotation.objects.create(
                         task=task,
                         label=label,
-                        model_label = ann.get('model_label') ,
+                        model_label=ann.get('model_label'),
                         start_time=ann['start_time'],
                         end_time=ann['end_time']
                     )
             else:
                 # Create new annotation if no annotation_id provided
+                print(ann.get('label_id'))
                 annotation = Annotation.objects.create(
                     task=task,
-                    label=label, 
+                    label=label,
                     start_time=ann['start_time'],
                     end_time=ann['end_time'],
                     model_label=ann['model_label']
                 )
+
 
             # Add attributes to the annotation
             for attr in ann.get('attributes', []):

@@ -128,16 +128,18 @@ const WaveformAnnotator = ({ audioUrl, labels, initialAnnotations, onAnnotations
     // Determine if this annotation is model-generated or user-created
     const isModelGenerated = regions[editingRegionId]?.modelLabel ? true : false;
   
+    // Ensure annotationId is correctly handled
     const updated = {
       ...regions,
       [editingRegionId]: {
-        annotationId: regions[editingRegionId].annotationId,
+        annotationId: regions[editingRegionId]?.annotationId ? +regions[editingRegionId]?.annotationId : null, // Convert to integer
         label: selectedLabelId,
         attributes: selectedAttributes,
-        modelLabel: regions[editingRegionId]?.modelLabel || null,  // Retain modelLabel if present
+        modelLabel: regions[editingRegionId]?.modelLabel || null,
         isModelGenerated,  // Add the model-generated flag
       },
     };
+    
   
     setRegions(updated);
     setShowLabelModal(false);
@@ -156,12 +158,14 @@ const WaveformAnnotator = ({ audioUrl, labels, initialAnnotations, onAnnotations
         attributes: Object.entries(val.attributes).map(([a, v]) => ({ attribute_id: +a, value_id: +v })),
         model_label: val.modelLabel,
         is_model_generated: val.isModelGenerated,  // Send the flag
+        annotation_id: val.annotationId  // Ensure this is sent properly
       };
     });
+    
   
+    // Ensure the annotationId is included when sending to backend
     onAnnotationsChange(out);
-  };
-  
+  };  
 
   const handleDelete = async () => {
     if (!editingRegionId) return;
